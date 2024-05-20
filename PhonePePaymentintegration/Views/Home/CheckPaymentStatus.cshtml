@@ -1,0 +1,88 @@
+﻿
+@{
+    string merchantId = System.Configuration.ConfigurationManager.AppSettings["mId"].ToString();
+    string saltKey = System.Configuration.ConfigurationManager.AppSettings["salt"].ToString();
+    ViewBag.Title = "CheckPaymentStatus";
+}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<div class="jumbotron">
+    <h3>Check your Payment status</h3>
+    <input id="paymentStatus" type="text" class="form-control" placeholder="Enter merchant Transaction Id" style="display: inline-block;" />
+    <button id="btnPayment" class="btn btn-success" style="display: inline-block;">
+        Payment
+        <span class="spinner" style="display: none"><i class="fas fa-spinner fa-spin"></i></span>
+    </button>
+    <hr />
+    <p></p>
+</div>
+<script>
+    $("#btnPayment").click(function () {
+        let tranId = $("#paymentStatus").val();
+        scheduleStatusChecks(tranId);
+    });
+    function scheduleStatusChecks(TransactionId) {
+        // Initial check after 20-25 seconds
+        //setTimeout(function () {
+        $('#btnPayment').text('Checking Payment Status...');
+
+        checkPhonePeStatus(TransactionId);
+
+        // Schedule checks "Every 3 seconds once for the next 30 seconds"
+        //var intervalCount = 0;
+        //intervalId = setInterval(function () {
+        //checkPhonePeStatus(TransactionId);
+        //intervalCount++;
+
+        //if (intervalCount >= 10) {
+        //    clearInterval(intervalId); // Stop after 30 seconds (10 intervals)
+        //}
+        //}, 3000);
+        //}, 20000 + Math.random() * 5000); // Random delay within the specified range
+    }
+
+    function checkPhonePeStatus(TransactionId) {
+        const sign_status = `/pg/v1/status/${'@merchantId'}/${TransactionId}${'@saltKey'}`; // Modify this accordingly based on your API
+        let X_VERIFY_STATUS = signRequest(sign_status) + "###1";
+
+        // Create an object to send in the request body
+        const requestBody = {
+            X_VERIFY: X_VERIFY_STATUS,
+            TransactionId: TransactionId,
+            MERCHANTID: '@merchantId'
+            // Other data you want to send in the request body
+        };
+
+        $.ajax({
+            url: "/Home/CheckPaymentStatus", // Replace with your controller and action names
+            type: "POST", // Change to POST to send data in the request body
+            dataType: "json",
+            data: JSON.stringify(requestBody), // Convert the object to JSON
+            contentType: "application/json", // Set the content type
+            success: function (res) {
+                let phonepestatus = JSON.parse(res.phonepeResponse);
+                $("p").text(res.phonepeResponse);
+                if (phonepestatus.code == 'PAYMENT_SUCCESS') {
+                    //clearInterval(intervalCount);
+                    alert('PAYMENT SUCCESS');
+                }
+                else if (phonepestatus.code == 'PAYMENT_ERROR') {
+                    alert('PAYMENT ERROR');
+                }
+
+
+            },
+            error: function (error) {
+                // Handle errors, if any
+                console.error(error);
+            }
+        });
+    }
+    function signRequest(payload) {
+        // Assuming you are using CryptoJS for hashing
+        const hashedPayload = CryptoJS.SHA256(payload).toString(CryptoJS.enc.Hex);
+        return hashedPayload;
+    }
+</script>
