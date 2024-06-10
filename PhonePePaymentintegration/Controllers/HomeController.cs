@@ -1,11 +1,16 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using PhonePePaymentintegration.Models;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
@@ -15,6 +20,8 @@ namespace PhonePePaymentintegration.Controllers
 {
     public class HomeController : Controller
     {
+        string merchantId = System.Configuration.ConfigurationManager.AppSettings["mId"].ToString();
+        string saltKey = System.Configuration.ConfigurationManager.AppSettings["salt"].ToString();
         public ActionResult Index()
         {
             return View();
@@ -50,9 +57,11 @@ namespace PhonePePaymentintegration.Controllers
 
                 // Read and deserialize the response content
                 var responseContent = await response.Content.ReadAsStringAsync();
-
+                //var onlineUrl = JsonConvert.DeserializeObject<string>(responseContent); 
+                var details = JObject.Parse(responseContent);
+                string url = details["data"]["instrumentResponse"]["redirectInfo"]["url"].ToString();
                 // Return a response
-                return Json(new { Success = true, Message = "Verification successful",phonepeResponse= responseContent });
+                return Json(new { Success = true, Message = "Verification successful", phonepeResponse = responseContent });
             }
             catch (Exception ex)
             {
@@ -75,7 +84,6 @@ namespace PhonePePaymentintegration.Controllers
                 //ServicePointManager.Expect100Continue = true;
                 //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                //var PhonePeGatewayURL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
                 var PhonePeGatewayURL = "https://api.phonepe.com/apis/hermes";
 
                 var httpClient = new HttpClient();
@@ -160,7 +168,68 @@ namespace PhonePePaymentintegration.Controllers
 
             return View();
         }
-        
+        [HttpGet]
+        public async Task<ActionResult> GeneratePaymentLink()
+        {
+            var baseUrl = "https://mercury-t2.phonepe.com";
+            var paymentLink = new PaymentLink()
+            {
+                merchantId = merchantId,
+                transactionId = Guid.NewGuid().ToString(),
+                merchantOrderId = Guid.NewGuid().ToString(),
+                amount = 100,
+                mobileNumber = "8296412345",
+                message = "paylink for 1 order",
+                expiresIn = 3600,
+                storeId = "store" + 50,
+                terminalId = "terminal10",
+                shortName = "Tinku",
+                subMerchantId = "test"
+            };
+            //var Modelpayload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(paymentLink)));
+            //var Payload = $"{Modelpayload}/v3/payLink/init{saltKey}";
+            //var x_VERIFY = ComputeSha256Hash(Payload, "1");
+            var request = JsonConvert.SerializeObject(paymentLink);
+            var load = Convert.ToBase64String(Encoding.UTF8.GetBytes(request));
+            var payload = $"{load}/v3/payLink/init{saltKey}";
+            var x_verify = ComputeSha256Hash(payload, "1");
+
+            var httpClient = new HttpClient();
+            var uri = new Uri($"{baseUrl}/v3/payLink/init");
+
+            // Add headers
+            httpClient.DefaultRequestHeaders.Add("accept", "application/json");
+            //httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
+            httpClient.DefaultRequestHeaders.Add("X-VERIFY", x_verify);
+            //httpClient.DefaultRequestHeaders.Add("X-CALLBACK-URL", "https://www.carvaidya.com/paymentstatuscallback");
+            //httpClient.DefaultRequestHeaders.Add("X-CALL-MODE", "https://www.carvaidya.com/paymentstatus");
+            httpClient.DefaultRequestHeaders.Add("X-PROVIDER-ID", merchantId);
+
+            // Create JSON request body
+            var jsonBody = $"{{\"request\":\"{load}\"}}";
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+            // Send POST request
+            var response = await httpClient.PostAsync(uri, content);
+            response.EnsureSuccessStatusCode();
+
+            // Read and deserialize the response content
+            var responseContent = await response.Content.ReadAsStringAsync();
+            return View();
+        }
+        public string ComputeSha256Hash(string rawData, string saltindex)
+        {
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+                return builder.ToString() + "###" + saltindex;
+            }
+        }
     }
 
     public class VerifyRequestModel
