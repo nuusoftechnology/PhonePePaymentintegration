@@ -181,17 +181,17 @@ namespace PhonePePaymentintegration.Controllers
                 mobileNumber = "8296412345",
                 message = "paylink for 1 order",
                 expiresIn = 3600,
-                storeId = "store" + 50,
+                storeId = $"store{50}",
                 terminalId = "terminal10",
-                shortName = "Tinku",
+                shortName = "Test short Name",
                 subMerchantId = "test"
             };
             //var Modelpayload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(paymentLink)));
             //var Payload = $"{Modelpayload}/v3/payLink/init{saltKey}";
             //var x_VERIFY = ComputeSha256Hash(Payload, "1");
-            var request = JsonConvert.SerializeObject(paymentLink);
-            var load = Convert.ToBase64String(Encoding.UTF8.GetBytes(request));
-            var payload = $"{load}/v3/payLink/init{saltKey}";
+            var requestJSON = JsonConvert.SerializeObject(paymentLink);
+            var PayloadString = Convert.ToBase64String(Encoding.UTF8.GetBytes(requestJSON));
+            var payload = $"{PayloadString}/v3/payLink/init{saltKey}";
             var x_verify = ComputeSha256Hash(payload, "1");
 
             var httpClient = new HttpClient();
@@ -206,7 +206,7 @@ namespace PhonePePaymentintegration.Controllers
             httpClient.DefaultRequestHeaders.Add("X-PROVIDER-ID", merchantId);
 
             // Create JSON request body
-            var jsonBody = $"{{\"request\":\"{load}\"}}";
+            var jsonBody = $"{{\"request\":\"{PayloadString}\"}}";
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
             // Send POST request
