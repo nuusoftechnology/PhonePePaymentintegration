@@ -201,8 +201,6 @@ namespace PhonePePaymentintegration.Controllers
             httpClient.DefaultRequestHeaders.Add("accept", "application/json");
             //httpClient.DefaultRequestHeaders.Add("Content-Type", "application/json");
             httpClient.DefaultRequestHeaders.Add("X-VERIFY", x_verify);
-            //httpClient.DefaultRequestHeaders.Add("X-CALLBACK-URL", "https://www.carvaidya.com/paymentstatuscallback");
-            //httpClient.DefaultRequestHeaders.Add("X-CALL-MODE", "https://www.carvaidya.com/paymentstatus");
             httpClient.DefaultRequestHeaders.Add("X-PROVIDER-ID", merchantId);
 
             // Create JSON request body
