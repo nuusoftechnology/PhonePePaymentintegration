@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PhonePePaymentintegration.Models;
+using RestSharp;
 using System;
 using System.Collections.Generic;
 using System.Drawing.Imaging;
@@ -37,8 +38,8 @@ namespace PhonePePaymentintegration.Controllers
                 //ServicePointManager.Expect100Continue = true;
                 //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
-                //var PhonePeGatewayURL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
-                var PhonePeGatewayURL = "https://api.phonepe.com/apis/hermes";
+                var PhonePeGatewayURL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
+                //var PhonePeGatewayURL = "https://api.phonepe.com/apis/hermes";
 
                 var httpClient = new HttpClient();
                 var uri = new Uri($"{PhonePeGatewayURL}/pg/v1/pay");
@@ -215,7 +216,41 @@ namespace PhonePePaymentintegration.Controllers
             var responseContent = await response.Content.ReadAsStringAsync();
             return View();
         }
-        public string ComputeSha256Hash(string rawData, string saltindex)
+        [HttpGet]
+        public async Task<JsonResult> InitiatePaymentHashAsync(int amount)
+        {
+            try
+            {
+                string saltIndex = "1";
+                string merchantTransactionId = Guid.NewGuid().ToString();
+
+                //var options = new RestClientOptions("https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay");
+                var options = new RestClientOptions("https://api.phonepe.com/apis/hermes/pg/v1/pay");
+                var client = new RestClient(options);
+                decimal PaymentAmount = Convert.ToDecimal(amount) * 100;
+
+                var request = new RestRequest("");
+                var requestcredential = new RestRequest("{\r\n  \"merchantId\": \"" + merchantId + "\",\r\n  \"merchantTransactionId\": \"" + merchantTransactionId + "\",\r\n  \"merchantUserId\": \"" + "testproject" + "\",\r\n  \"amount\": " + PaymentAmount + ",\r\n  \"redirectUrl\": \"###\",\r\n  \"redirectMode\": \"POST\",\r\n  \"callbackUrl\": \"$$$\",\r\n  \"mobileNumber\": \"" + "8930394008" + "\",\r\n  \"paymentInstrument\": {\r\n    \"type\": \"PAY_PAGE\"\r\n  }\r\n}");
+
+                requestcredential.Resource = requestcredential.Resource.Replace("###", "https://webhook.site/redirect-url");
+                requestcredential.Resource = requestcredential.Resource.Replace("$$$", "https://webhook.site/callback-url");
+                string encodedStr = Convert.ToBase64String(Encoding.UTF8.GetBytes(requestcredential.Resource.ToString()));
+                string plainData = encodedStr + "/pg/v1/pay" + saltKey;
+                var sha256Data = ComputeSha256Hash(plainData, saltIndex);
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("Content-Type", "application/json");
+                request.AddHeader("X-VERIFY", sha256Data);
+                request.AddJsonBody("{\"request\":\"" + encodedStr + "\"}", false);
+                var response = await client.PostAsync(request);
+                return Json(response);
+            }
+            catch (Exception ex)
+            {
+                return Json("Fail: Exception" + ex.Message);
+            }
+        }
+
+        static string ComputeSha256Hash(string rawData, string saltindex)
         {
             using (SHA256 sha256Hash = SHA256.Create())
             {
